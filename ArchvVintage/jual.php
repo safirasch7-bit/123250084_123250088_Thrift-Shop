@@ -2,21 +2,32 @@
 require 'koneksi.php';
 wajib_login();
 
+// Ambil ID user yang sedang login dari session
+$user_id = (int)($_SESSION['user_id'] ?? 0);
+if ($user_id === 0) {
+    header("Location: login.php");
+    exit;
+}
+
 // Ambil notifikasi flash
 $notif = $_SESSION['notif'] ?? "";
 unset($_SESSION['notif']);
 
-// Hitung statistik untuk 3 kartu dashboard
-$stat_query = mysqli_query($conn, "
+// 1. Hitung statistik KHUSUS milik user yang sedang login
+$stmt_stat = $conn->prepare("
     SELECT 
         COUNT(*) AS total_produk,
         COALESCE(SUM(stok), 0) AS total_stok,
         SUM(CASE WHEN stok = 0 THEN 1 ELSE 0 END) AS produk_habis
     FROM produk
+    WHERE user_id = ?
 ");
-$stats = mysqli_fetch_assoc($stat_query);
+$stmt_stat->bind_param("i", $user_id);
+$stmt_stat->execute();
+$stats = $stmt_stat->get_result()->fetch_assoc();
+$stmt_stat->close();
 
-// Fitur Pencarian (Bonus)
+// 2. Fitur Pencarian & Daftar Produk KHUSUS milik user yang sedang login
 $keyword = trim($_GET['cari'] ?? '');
 if ($keyword !== '') {
     $like = "%" . $keyword . "%";
@@ -24,54 +35,55 @@ if ($keyword !== '') {
         SELECT p.*, u.username AS penjual 
         FROM produk p 
         JOIN users u ON p.user_id = u.id 
-        WHERE p.nama_barang LIKE ? 
+        WHERE p.user_id = ? AND p.nama_barang LIKE ? 
         ORDER BY p.id DESC
     ");
-    $stmt->bind_param("s", $like);
-    $stmt->execute();
-    $produk_list = $stmt->get_result();
+    $stmt->bind_param("is", $user_id, $like);
 } else {
-    $produk_list = mysqli_query($conn, "
+    $stmt = $conn->prepare("
         SELECT p.*, u.username AS penjual 
         FROM produk p 
         JOIN users u ON p.user_id = u.id 
+        WHERE p.user_id = ? 
         ORDER BY p.id DESC
     ");
+    $stmt->bind_param("i", $user_id);
 }
+$stmt->execute();
+$produk_list = $stmt->get_result();
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>ArchvVintage</title>
-    <link
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.9/dist/css/bootstrap.min.css"
-        rel="stylesheet"
-        integrity="sha384-yEPZ7jP9S0QKiUQ0m3jjsO4ProIW7wvR9gXkI7JOGa2XVsw53Yke2bsdkBbjmmiX"
-        crossorigin="anonymous"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelola Barang Saya - ArchvVintage</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.9/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-yEPZ7jP9S0QKiUQ0m3jjsO4ProIW7wvR9gXkI7JOGa2XVsw53Yke2bsdkBbjmmiX" crossorigin="anonymous">
 </head>
 <body class="bg-light">
     <nav class="navbar navbar-dark bg-dark px-4">
-        <span class="navbar-brand mb-0 h1">ArchvVintage</span>
-        <a href="logout.php" class="btn btn-outline-light btn-sm">Keluar</a>
+        <a href="index.php" class="navbar-brand mb-0 h1">ArchvVintage</a>
+        <div class="d-flex gap-2">
+            <a href="index.php" class="btn btn-outline-light btn-sm">Lihat Katalog</a>
+            <a href="logout.php" class="btn btn-outline-danger btn-sm">Keluar</a>
+        </div>
     </nav>
 
     <div class="container my-4">
-        <h2 class="mb-0">Katalog Barang Thrift</h2>
+        <h2 class="mb-0">Histori & Kelola Barang Saya</h2>
         <p class="text-muted">Masuk sebagai <strong><?= htmlspecialchars($_SESSION['username']) ?></strong></p>
 
-        <!-- 3 Kartu Statistik -->
+        <!-- 3 Kartu Statistik Milik Akun Ini -->
         <div class="row g-3 mb-4">
             <div class="col-md-4">
                 <div class="card p-3 shadow-sm">
-                    <div class="text-muted small">Total Produk</div>
+                    <div class="text-muted small">Total Produk Saya</div>
                     <div class="fs-3 fw-bold"><?= (int)$stats['total_produk'] ?></div>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="card p-3 shadow-sm">
-                    <div class="text-muted small">Total Stok</div>
+                    <div class="text-muted small">Total Stok Saya</div>
                     <div class="fs-3 fw-bold"><?= (int)$stats['total_stok'] ?></div>
                 </div>
             </div>
@@ -97,18 +109,18 @@ if ($keyword !== '') {
                     type="text"
                     name="cari"
                     class="form-control"
-                    placeholder="Cari nama barang..."
+                    placeholder="Cari barang saya..."
                     value="<?= htmlspecialchars($keyword) ?>"
                 >
                 <button type="submit" class="btn btn-outline-secondary">Cari</button>
                 <?php if ($keyword !== ''): ?>
-                    <a href="index.php" class="btn btn-outline-danger">Reset</a>
+                    <a href="jual.php" class="btn btn-outline-danger">Reset</a>
                 <?php endif; ?>
             </form>
             <a href="tambah.php" class="btn btn-primary">+ Jual Barang</a>
         </div>
 
-        <!-- Tabel Katalog Produk -->
+        <!-- Tabel Katalog Produk Milik User -->
         <div class="card shadow-sm">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
@@ -124,14 +136,14 @@ if ($keyword !== '') {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (mysqli_num_rows($produk_list) === 0): ?>
+                        <?php if ($produk_list->num_rows === 0): ?>
                             <tr>
                                 <td colspan="7" class="text-center text-muted py-4">
-                                    <?= $keyword !== '' ? "Barang tidak ditemukan." : "Belum ada barang yang dijual." ?>
+                                    <?= $keyword !== '' ? "Barang tidak ditemukan." : "Anda belum memiliki barang yang dijual." ?>
                                 </td>
                             </tr>
                         <?php else: ?>
-                            <?php while ($row = mysqli_fetch_assoc($produk_list)): ?>
+                            <?php while ($row = $produk_list->fetch_assoc()): ?>
                                 <?php
                                 $stok = (int)$row['stok'];
                                 if ($stok === 0) {
@@ -159,7 +171,7 @@ if ($keyword !== '') {
                                         </div>
                                     </td>
                                     <td><?= htmlspecialchars($row['kategori']) ?></td>
-                                    <td>Rp <?= number_format($row['harga'], 0, ',', '.') ?></td>
+                                    <td>Rp <?= number_format((int)str_replace('.', '', $row['harga']), 0, ',', '.') ?></td>
                                     <td><?= $stok ?></td>
                                     <td><?= $badge ?></td>
                                     <td>
@@ -187,7 +199,6 @@ if ($keyword !== '') {
         </div>
     </div>
 
-    <!-- JavaScript menghilangkan notifikasi otomatis setelah 4 detik -->
     <script>
         const alertBox = document.getElementById('alertNotif');
         if (alertBox) {
@@ -198,6 +209,5 @@ if ($keyword !== '') {
             }, 4000);
         }
     </script>
-
 </body>
 </html>

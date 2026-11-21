@@ -344,6 +344,7 @@ $category_url = function ($value) use ($keyword) {
             border-radius: 16px;
             background: var(--paper);
             transition: transform .18s ease, box-shadow .18s ease;
+            height: 450px;
         }
 
         .product-card:hover {
@@ -403,8 +404,8 @@ $category_url = function ($value) use ($keyword) {
         .product-name {
             display: -webkit-box;
             overflow: hidden;
-            min-height: 42px;
-            margin: 6px 0 4px;
+            min-height: 35px;
+            margin: 6px 0 2px;
             font-size: 15px;
             font-weight: 700;
             line-height: 1.4;
@@ -415,7 +416,7 @@ $category_url = function ($value) use ($keyword) {
         .product-description {
             display: -webkit-box;
             overflow: hidden;
-            min-height: 35px;
+            min-height: 10px;
             margin: 0 0 10px;
             color: var(--muted);
             font-size: 12px;
@@ -426,6 +427,7 @@ $category_url = function ($value) use ($keyword) {
 
         .price {
             color: var(--accent-dark);
+            margin-top: 8px; 
             font-size: 17px;
             font-weight: 800;
         }
@@ -616,7 +618,7 @@ $category_url = function ($value) use ($keyword) {
                 <?php endif; ?>
                 <a
                     class="button button-primary"
-                    href="<?= $is_logged_in ? 'tambah.php' : 'login.php' ?>"
+                    href="<?= $is_logged_in ? 'jual.php' : 'login.php' ?>"
                 >＋ Jual</a>
             </nav>
         </div>
@@ -692,22 +694,6 @@ $category_url = function ($value) use ($keyword) {
                                 <p class="product-description"><?= htmlspecialchars($row['deskripsi']) ?></p>
                                 <div class="price">Rp <?= number_format((int)$row['harga'], 0, ',', '.') ?></div>
                                 <div class="seller">Dijual oleh <?= htmlspecialchars($row['penjual']) ?></div>
-                                <?php if ($is_owner): ?>
-                                    <div class="card-actions">
-                                        <a
-                                            class="button button-outline"
-                                            href="edit.php?id=<?= (int)$row['id'] ?>"
-                                        >Edit</a>
-                                        <form
-                                            action="hapus.php"
-                                            method="POST"
-                                            onsubmit="return confirm('Yakin ingin menghapus barang ini?');"
-                                        >
-                                            <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
-                                            <button class="button button-danger" type="submit">Hapus</button>
-                                        </form>
-                                    </div>
-                                <?php endif; ?>
                             </div>
                         </article>
                     <?php endwhile; ?>

@@ -2,6 +2,8 @@
 require 'koneksi.php';
 wajib_login();
 
+DELETE FROM produk WHERE id = ? AND user_id = ?;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 

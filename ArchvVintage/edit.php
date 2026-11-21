@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($nama_barang === '' || strlen($nama_barang) > 100) {
         $error = "Nama barang wajib diisi (maksimal 100 karakter).";
     } elseif ($kategori === '' || strlen($kategori) > 50) {
-        $error = "Kategori/kondisi wajib diisi (maksimal 50 karakter).";
+        $error = "Kategori wajib diisi (maksimal 50 karakter).";
     } elseif (!is_numeric($harga) || (int)$harga < 0) {
         $error = "Harga harus berupa angka mulai dari 0.";
     } elseif (filter_var($stok, FILTER_VALIDATE_INT) === false || (int)$stok < 0) {
@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <title>Edit Barang - Thrift Shop</title>
-    <link href="https://jsdelivr.net" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.9/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-yEPZ7jP9S0QKiUQ0m3jjsO4ProIW7wvR9gXkI7JOGa2XVsw53Yke2bsdkBbjmmiX" crossorigin="anonymous">
 </head>
 <body class="bg-light">
 <div class="container my-5" style="max-width: 550px;">
@@ -118,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="text" name="nama_barang" class="form-control" value="<?= htmlspecialchars($nama_barang) ?>" required>
             </div>
             <div class="mb-3">
-                <label class="form-label">Kategori & Keterangan Kondisi</label>
+                <label class="form-label">Kategori</label>
                 <input type="text" name="kategori" class="form-control" value="<?= htmlspecialchars($kategori) ?>" required>
             </div>
             <div class="row">
@@ -136,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <textarea name="deskripsi" rows="3" class="form-control" required><?= htmlspecialchars($deskripsi) ?></textarea>
             </div>
             <button type="submit" class="btn btn-primary">Simpan</button>
-            <a href="index.php" class="btn btn-outline-secondary">Batal</a>
+            <a href="jual.php" class="btn btn-outline-secondary">Batal</a>
         </form>
     </div>
 </div>
