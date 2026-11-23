@@ -1,122 +1,131 @@
 <?php
-require 'koneksi.php';
-wajib_login();
+include "koneksi.php";
 
-$error = "";
-$nama_barang = "";
-$kategori = "";
-$harga = "";
-$stok = "1";
-$deskripsi = "";
+$error = [];
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nama_barang = trim($_POST['nama_barang'] ?? '');
-    $kategori    = trim($_POST['kategori'] ?? '');
-    $harga       = $_POST['harga'] ?? '';
-    $stok        = $_POST['stok'] ?? '';
-    $deskripsi   = trim($_POST['deskripsi'] ?? '');
+if (isset($_POST['register'])) {
 
-    // Validasi input teks & angka
-    if ($nama_barang === '' || strlen($nama_barang) > 100) {
-        $error = "Nama barang wajib diisi (maksimal 100 karakter).";
-    } elseif ($kategori === '' || strlen($kategori) > 50) {
-        $error = "Kategori wajib diisi (maksimal 50 karakter).";
-    } elseif (!is_numeric($harga) || (int)$harga < 0) {
-        $error = "Harga harus berupa angka mulai dari 0.";
-    } elseif (filter_var($stok, FILTER_VALIDATE_INT) === false || (int)$stok < 0) {
-        $error = "Stok harus berupa bilangan bulat mulai dari 0.";
-    } elseif ($deskripsi === '') {
-        $error = "Deskripsi produk wajib diisi.";
-    } elseif (!isset($_FILES['foto']) || $_FILES['foto']['error'] !== UPLOAD_ERR_OK) {
-        $error = "Foto produk wajib diunggah.";
-    } else {
-        // Validasi ekstensi dan ukuran file foto
-        $ekstensi_valid = ['jpg', 'jpeg', 'png', 'webp'];
-        $nama_file_asli = $_FILES['foto']['name'];
-        $ukuran_file    = $_FILES['foto']['size'];
-        $tmp_name       = $_FILES['foto']['tmp_name'];
-        $ekstensi       = strtolower(pathinfo($nama_file_asli, PATHINFO_EXTENSION));
+    $username = trim($_POST['username']);
+    $password = $_POST['password'];
+    $konfirmasi = $_POST['konfirmasi'];
 
-        if (!in_array($ekstensi, $ekstensi_valid)) {
-            $error = "Format foto harus JPG, JPEG, PNG, atau WEBP.";
-        } elseif ($ukuran_file > 2 * 1024 * 1024) {
-            $error = "Ukuran foto maksimal 2 MB.";
-        } else {
-            // Buat nama file unik agar tidak tertimpa
-            $nama_file_baru = uniqid('produk_', true) . '.' . $ekstensi;
-            $tujuan = 'uploads/' . $nama_file_baru;
+    if (!preg_match('/^[a-zA-Z0-9_]{3,30}$/', $username)) {
+        $error['username'] = "Username harus 3-30 karakter.";
+    }
 
-            if (move_uploaded_file($tmp_name, $tujuan)) {
-                $user_id   = $_SESSION['user_id'];
-                $harga_int = (int)$harga;
-                $stok_int  = (int)$stok;
+    if (strlen($password) < 8) {
+        $error['password'] = "Password minimal 8 karakter.";
+    }
 
-                $stmt = $conn->prepare("INSERT INTO produk (user_id, nama_barang, kategori, harga, stok, deskripsi, foto) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("issiiss", $user_id, $nama_barang, $kategori, $harga_int, $stok_int, $deskripsi, $nama_file_baru);
-                
-                if ($stmt->execute()) {
-                    $_SESSION['notif'] = "Barang thrift berhasil ditambahkan ke katalog.";
-                    header("Location: index.php");
-                    exit;
-                } else {
-                    $error = "Gagal menyimpan data ke database.";
-                }
-                $stmt->close();
-            } else {
-                $error = "Gagal mengunggah foto ke server.";
-            }
+    if ($password !== $konfirmasi) {
+        $error['konfirmasi'] = "Password tidak sama.";
+    }
+
+    // Cek username hanya jika format username sudah valid
+    if (!isset($error['username'])) {
+        $stmt = $conn->prepare(
+            "SELECT id FROM users WHERE username = ?"
+        );
+
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $stmt->store_result();
+
+        if ($stmt->num_rows > 0) {
+            $error['username'] = "Username sudah dipakai.";
         }
+
+        $stmt->close();
+    }
+
+    // Simpan akun
+    if (empty($error)) {
+
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+
+        $stmt = $conn->prepare(
+            "INSERT INTO users (username, password_hash)
+             VALUES (?, ?)"
+        );
+
+        $stmt->bind_param("ss", $username, $hash);
+        $stmt->execute();
+        $stmt->close();
+
+        header("Location: login.php?status=berhasil");
+        exit;
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Jual Barang - ArchvVintage</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.9/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-yEPZ7jP9S0QKiUQ0m3jjsO4ProIW7wvR9gXkI7JOGa2XVsw53Yke2bsdkBbjmmiX" crossorigin="anonymous">
+    <title>Register Rental DVD</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
-<div class="container my-5" style="max-width: 550px;">
-    <div class="card shadow-sm p-4">
-        <div class="text-uppercase text-muted small fw-bold">Thrift Shop</div>
-        <h3 class="mb-3">Jual Barang Baru</h3>
 
-        <?php if ($error): ?>
-            <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
-        <?php endif; ?>
+<div class="container mt-5">
+    <div class="card mx-auto p-4" style="max-width:450px">
+        <h3 class="text-center mb-3">Register</h3>
 
-        <form method="POST" enctype="multipart/form-data">
+        <form method="POST">
+            <!-- Input Username -->
             <div class="mb-3">
-                <label class="form-label">Foto Produk (JPG/PNG/WEBP, maks 2MB)</label>
-                <input type="file" name="foto" class="form-control" accept=".jpg,.jpeg,.png,.webp" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Nama Barang</label>
-                <input type="text" name="nama_barang" class="form-control" placeholder="Contoh: Jaket Denim Vintage 90s" value="<?= htmlspecialchars($nama_barang) ?>" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Kategori</label>
-                <input type="text" name="kategori" class="form-control" placeholder="Contoh: Pria/Wanita/Anak-anak/Accessories" value="<?= htmlspecialchars($kategori) ?>" required>
-            </div>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Harga (Rp)</label>
-                    <input type="number" name="harga" class="form-control" min="0" value="<?= htmlspecialchars($harga) ?>" required placeholder="Contoh: 50000">
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Stok</label>
-                    <input type="number" name="stok" class="form-control" min="0" value="<?= htmlspecialchars($stok) ?>" required>
+                <label for="username" class="form-label">Username</label>
+                <input 
+                    type="text" 
+                    name="username" 
+                    id="username"
+                    class="form-control <?= isset($error['username']) ? 'is-invalid' : '' ?>"
+                    value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
+                >
+                <div class="invalid-feedback">
+                    <?= $error['username'] ?? '' ?>
                 </div>
             </div>
+            
+            <!-- Input Password -->
             <div class="mb-3">
-                <label class="form-label">Deskripsi Produk</label>
-                <textarea name="deskripsi" rows="3" class="form-control" placeholder="Jelaskan ukuran (P x L), minus pemakaian, bahan, dll." required><?= htmlspecialchars($deskripsi) ?></textarea>
+                <label for="password" class="form-label">Password</label>
+                <input 
+                    type="password" 
+                    name="password" 
+                    id="password"
+                    class="form-control <?= isset($error['password']) ? 'is-invalid' : '' ?>"
+                >
+                <div class="invalid-feedback">
+                    <?= $error['password'] ?? '' ?>
+                </div>
             </div>
-            <button type="submit" class="btn btn-primary">Simpan & Jual</button>
-            <a href="index.php" class="btn btn-outline-secondary">Batal</a>
+
+            <!-- Input Konfirmasi Password -->
+            <div class="mb-3">
+                <label for="konfirmasi" class="form-label">Konfirmasi Password</label>
+                <input 
+                    type="password" 
+                    name="konfirmasi" 
+                    id="konfirmasi"
+                    class="form-control <?= isset($error['konfirmasi']) ? 'is-invalid' : '' ?>"
+                >
+                <div class="invalid-feedback">
+                    <?= $error['konfirmasi'] ?? '' ?>
+                </div>
+            </div>
+
+            <button type="submit" name="register" class="btn btn-primary w-100 mt-2">
+                Daftar
+            </button>
         </form>
+
+        <p class="text-center mt-3 mb-0">
+            Sudah punya akun?
+            <a href="login.php">Login</a>
+        </p>
     </div>
 </div>
+
 </body>
 </html>
